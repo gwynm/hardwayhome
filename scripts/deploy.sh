@@ -4,6 +4,10 @@ set -euo pipefail
 echo "=== Hard Way Home: Test, Build & Deploy ==="
 echo ""
 
+# Stamp build info (git hash + date)
+echo "--- Generating build info ---"
+bash scripts/generate-build-info.sh
+
 # Run tests
 echo "--- Running tests ---"
 npm test

@@ -21,6 +21,7 @@ import {
   backupWithLogs,
   initBackupStatus,
 } from '@/src/services/backup';
+import { BUILD_COMMIT, BUILD_DATE } from '@/src/buildInfo';
 
 export default function SettingsScreen() {
   const [url, setUrl] = useState('');
@@ -209,6 +210,11 @@ export default function SettingsScreen() {
               <Text style={styles.clearButtonText}>Clear WebDAV Settings</Text>
             </TouchableOpacity>
           )}
+
+          {/* Build info */}
+          <Text style={styles.buildInfo}>
+            {BUILD_COMMIT} · {BUILD_DATE}
+          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -330,5 +336,12 @@ const styles = StyleSheet.create({
     color: '#EF4444',
     fontSize: 15,
     fontWeight: '600',
+  },
+  buildInfo: {
+    color: '#636366',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 32,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
 });
