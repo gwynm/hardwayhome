@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "Hard Way Home",
+    "slug": "hardwayhome",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "hardwayhome",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.hardwayhome.app",
+      "infoPlist": {
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Hard Way Home tracks your location during workouts to calculate distance and pace.",
+        "NSLocationWhenInUseUsageDescription": "Hard Way Home tracks your location during workouts to calculate distance and pace.",
+        "NSBluetoothAlwaysUsageDescription": "Hard Way Home connects to your heart rate monitor during workouts.",
+        "UIBackgroundModes": [
+          "location",
+          "bluetooth-central"
+        ]
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#1C1008"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Hard Way Home tracks your location during workouts to calculate distance and pace.",
+          "isIosBackgroundLocationEnabled": true
+        }
+      ],
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": true,
+          "modes": ["central"],
+          "bluetoothAlwaysPermission": "Hard Way Home connects to your heart rate monitor during workouts."
+        }
+      ],
+      "expo-sqlite"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

@@ -1,0 +1,151 @@
+import { useState } from 'react';
+import { Alert, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import { useEffect } from 'react';
+import { useWorkoutRecording } from '@/src/hooks/useWorkoutRecording';
+import { useWorkoutStats } from '@/src/hooks/useWorkoutStats';
+import { useHeartRate } from '@/src/hooks/useHeartRate';
+import { LiveStats } from '@/src/components/LiveStats';
+import { GpsStatusIndicator } from '@/src/components/GpsStatus';
+import { HrStatusIndicator } from '@/src/components/HrStatus';
+import { BleDevicePicker } from '@/src/components/BleDevicePicker';
+
+export default function WorkoutScreen() {
+  const [showBlePicker, setShowBlePicker] = useState(false);
+  const { activeWorkout, finish, discard } = useWorkoutRecording();
+  const stats = useWorkoutStats(
+    activeWorkout?.id ?? null,
+    activeWorkout?.started_at ?? null
+  );
+  const hr = useHeartRate();
+
+  // Keep the screen awake during workouts
+  useEffect(() => {
+    activateKeepAwakeAsync();
+    return () => {
+      deactivateKeepAwake();
+    };
+  }, []);
+
+  // Set BLE to record pulses for this workout
+  useEffect(() => {
+    if (activeWorkout) {
+      hr.setActiveWorkoutId(activeWorkout.id);
+    }
+    return () => {
+      hr.setActiveWorkoutId(null);
+    };
+  }, [activeWorkout?.id]);
+
+  const handleStop = () => {
+    Alert.alert(
+      'Stop Workout',
+      'What would you like to do?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Finish & Delete',
+          style: 'destructive',
+          onPress: () => discard(),
+        },
+        {
+          text: 'Finish & Save',
+          onPress: () => finish(),
+        },
+      ]
+    );
+  };
+
+  if (!activeWorkout) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Text style={styles.noWorkoutText}>No active workout</Text>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Status indicators */}
+      <View style={styles.statusRow}>
+        <GpsStatusIndicator />
+        <HrStatusIndicator
+          connectionState={hr.connectionState}
+          currentBpm={hr.currentBpm}
+          onPress={() => setShowBlePicker(true)}
+        />
+      </View>
+
+      {/* Live stats grid */}
+      <View style={styles.statsContainer}>
+        <LiveStats stats={stats} />
+      </View>
+
+      {/* Stop button */}
+      <View style={styles.bottomSection}>
+        <TouchableOpacity
+          style={styles.stopButton}
+          onPress={handleStop}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.stopButtonText}>Stop</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* BLE device picker modal */}
+      <BleDevicePicker
+        visible={showBlePicker}
+        onClose={() => setShowBlePicker(false)}
+        connectionState={hr.connectionState}
+        devices={hr.discoveredDevices}
+        onScan={hr.scan}
+        onStopScan={hr.stopScanning}
+        onConnect={hr.connect}
+        onDisconnect={hr.disconnect}
+        lastDevice={hr.lastDevice}
+      />
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  statsContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  bottomSection: {
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+  },
+  stopButton: {
+    backgroundColor: '#EF4444',
+    paddingVertical: 18,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  stopButtonText: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  noWorkoutText: {
+    color: '#8E8E93',
+    fontSize: 17,
+    textAlign: 'center',
+    paddingTop: 100,
+  },
+});
