@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import { getDatabase } from '@/src/db/database';
 import { getActiveWorkout } from '@/src/db/queries';
 import { requestLocationPermissions } from '@/src/services/location';
-import { requestBlePermission } from '@/src/services/heartrate';
+import { requestBlePermission, reconnectToLastDevice } from '@/src/services/heartrate';
 import { initBackupStatus } from '@/src/services/backup';
 
 // Import location service to register the background task at module scope.
@@ -33,6 +33,12 @@ export default function RootLayout() {
       // Initialize backup status from stored config
       initBackupStatus();
 
+      // Auto-reconnect to last known heart rate monitor (non-blocking).
+      // This runs after BLE permission is granted and silently fails
+      // if the device isn't nearby or was never paired.
+      reconnectToLastDevice().catch(() => {});
+
+
       // Check for active workout and navigate accordingly
       const activeWorkout = getActiveWorkout();
       if (activeWorkout) {
@@ -57,6 +63,7 @@ export default function RootLayout() {
           headerTintColor: '#FFFFFF',
           contentStyle: { backgroundColor: '#000000' },
           headerShown: false,
+          animation: 'none',
         }}
       >
         <Stack.Screen name="index" />
