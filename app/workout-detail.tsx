@@ -49,7 +49,11 @@ export default function WorkoutDetailScreen() {
       <ScrollView contentContainerStyle={styles.scroll}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+            style={styles.backTouchable}
+          >
             <Text style={styles.backButton}>‹ Back</Text>
           </TouchableOpacity>
           <Text style={styles.headerDate}>{formatDate(workout.started_at)}</Text>
@@ -104,6 +108,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  backTouchable: {
+    paddingVertical: 8,
+    paddingRight: 16,
   },
   backButton: {
     color: '#0A84FF',

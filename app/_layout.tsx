@@ -73,8 +73,14 @@ export default function RootLayout() {
             gestureEnabled: false, // Prevent accidental swipe-back during workout
           }}
         />
-        <Stack.Screen name="settings" />
-        <Stack.Screen name="workout-detail" />
+        <Stack.Screen
+          name="settings"
+          options={{ gestureEnabled: true, fullScreenGestureEnabled: true }}
+        />
+        <Stack.Screen
+          name="workout-detail"
+          options={{ gestureEnabled: true, fullScreenGestureEnabled: true }}
+        />
       </Stack>
       <StatusBar style="light" />
     </>
