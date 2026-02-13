@@ -3,10 +3,12 @@ import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { TouchableOpacity } from 'react-native';
+import { AppleMaps } from 'expo-maps';
 import {
   getWorkoutById,
   getTrackpoints,
   getPulses,
+  type Trackpoint,
 } from '@/src/db/queries';
 import { trackpointDistance } from '@/src/utils/pace';
 import { paceOverWindow } from '@/src/utils/pace';
@@ -44,6 +46,7 @@ export default function WorkoutDetailScreen() {
 
     return {
       workout,
+      trackpoints,
       distance,
       elapsedSeconds,
       pace100m,
@@ -61,7 +64,10 @@ export default function WorkoutDetailScreen() {
     );
   }
 
-  const { workout, distance, elapsedSeconds, pace100m, pace1000m, avgBpm, splits } = data;
+  const { workout, trackpoints, distance, elapsedSeconds, pace100m, pace1000m, avgBpm, splits } = data;
+
+  // Compute map camera from trackpoint bounding box
+  const mapCamera = useMemo(() => computeCamera(trackpoints), [trackpoints]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -113,9 +119,78 @@ export default function WorkoutDetailScreen() {
             ))}
           </View>
         )}
+        {/* Route map */}
+        {trackpoints.length >= 2 && mapCamera && (
+          <View style={styles.mapSection}>
+            <Text style={styles.splitsTitle}>Route</Text>
+            <View style={styles.mapContainer}>
+              <AppleMaps.View
+                style={styles.map}
+                cameraPosition={mapCamera}
+                polylines={[
+                  {
+                    coordinates: trackpoints.map((tp) => ({
+                      latitude: tp.lat,
+                      longitude: tp.lng,
+                    })),
+                    color: '#0A84FF',
+                    width: 3,
+                  },
+                ]}
+                properties={{
+                  isTrafficEnabled: false,
+                  pointsOfInterest: { including: [] },
+                }}
+                uiSettings={{
+                  compassEnabled: true,
+                  scaleBarEnabled: true,
+                }}
+              />
+            </View>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+/**
+ * Compute a camera position that fits the bounding box of the trackpoints.
+ * Returns center coordinates and a zoom level estimated from the span.
+ */
+function computeCamera(trackpoints: Trackpoint[]): {
+  coordinates: { latitude: number; longitude: number };
+  zoom: number;
+} | null {
+  if (trackpoints.length === 0) return null;
+
+  let minLat = Infinity, maxLat = -Infinity;
+  let minLng = Infinity, maxLng = -Infinity;
+
+  for (const tp of trackpoints) {
+    if (tp.lat < minLat) minLat = tp.lat;
+    if (tp.lat > maxLat) maxLat = tp.lat;
+    if (tp.lng < minLng) minLng = tp.lng;
+    if (tp.lng > maxLng) maxLng = tp.lng;
+  }
+
+  const midLat = (minLat + maxLat) / 2;
+  const midLng = (minLng + maxLng) / 2;
+
+  // Estimate zoom from the larger span dimension (in degrees)
+  // Add padding so the track doesn't touch the edges
+  const latSpan = (maxLat - minLat) * 1.3;
+  const lngSpan = (maxLng - minLng) * 1.3;
+  const span = Math.max(latSpan, lngSpan, 0.002); // minimum span
+
+  // Rough mapping: zoom ~14 for 0.02 degrees, ~12 for 0.08, ~10 for 0.3
+  // Formula: zoom ≈ log2(360 / span) + small offset for padding
+  const zoom = Math.max(8, Math.min(18, Math.log2(360 / span) + 1.5));
+
+  return {
+    coordinates: { latitude: midLat, longitude: midLng },
+    zoom,
+  };
 }
 
 function StatCell({ label, value }: { label: string; value: string }) {
@@ -242,5 +317,19 @@ const styles = StyleSheet.create({
   bpmCol: {
     width: 80,
     textAlign: 'right',
+  },
+
+  // Map
+  mapSection: {
+    marginTop: 24,
+    marginHorizontal: 16,
+  },
+  mapContainer: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  map: {
+    height: 350,
+    width: '100%',
   },
 });
