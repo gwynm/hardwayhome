@@ -10,7 +10,7 @@ import {
   getPulses,
   type Trackpoint,
 } from '@/src/db/queries';
-import { trackpointDistance, paceOverWindow } from '@/src/utils/pace';
+import { trackpointDistance } from '@/src/utils/pace';
 import { computeKmSplits } from '@/src/utils/splits';
 import { filterReliableTrackpoints } from '@/src/utils/trackpointFilter';
 import {
@@ -36,12 +36,6 @@ export default function WorkoutDetailScreen() {
     const endMs = new Date(workout.finished_at).getTime();
     const elapsedSeconds = Math.max(0, (endMs - startMs) / 1000);
 
-    const pace100m = paceOverWindow(trackpoints, 100);
-    const pace1000m = paceOverWindow(trackpoints, 1000);
-
-    // Overall average BPM
-    const avgBpm = workout.avg_bpm;
-
     const splits = computeKmSplits(trackpoints, pulses);
 
     return {
@@ -49,12 +43,15 @@ export default function WorkoutDetailScreen() {
       trackpoints,
       distance,
       elapsedSeconds,
-      pace100m,
-      pace1000m,
-      avgBpm,
       splits,
     };
   }, [workoutId]);
+
+  // Compute map camera from trackpoint bounding box (must be before early return to satisfy hooks rules)
+  const mapCamera = useMemo(
+    () => (data ? computeCamera(data.trackpoints) : null),
+    [data],
+  );
 
   if (!data) {
     return (
@@ -64,10 +61,7 @@ export default function WorkoutDetailScreen() {
     );
   }
 
-  const { workout, trackpoints, distance, elapsedSeconds, pace100m, pace1000m, avgBpm, splits } = data;
-
-  // Compute map camera from trackpoint bounding box
-  const mapCamera = useMemo(() => computeCamera(trackpoints), [trackpoints]);
+  const { workout, trackpoints, distance, elapsedSeconds, splits } = data;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -81,19 +75,11 @@ export default function WorkoutDetailScreen() {
           <View style={styles.headerSpacer} />
         </View>
 
-        {/* Summary stats grid */}
+        {/* Summary stats */}
         <View style={styles.grid}>
           <View style={styles.gridRow}>
             <StatCell label="Distance" value={formatDistance(distance)} />
             <StatCell label="Time" value={formatDuration(elapsedSeconds)} />
-          </View>
-          <View style={styles.gridRow}>
-            <StatCell label="Pace (100m)" value={formatPace(pace100m)} />
-            <StatCell label="Pace (1km)" value={formatPace(pace1000m)} />
-          </View>
-          <View style={styles.gridRow}>
-            <StatCell label="Avg BPM" value={formatBpm(avgBpm)} />
-            <StatCell label="" value="" />
           </View>
         </View>
 

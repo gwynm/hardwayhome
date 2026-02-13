@@ -14,7 +14,7 @@ export type KmSplit = {
  * distance crosses a 1 km boundary, a split is recorded with the elapsed time
  * and the average BPM of pulses that fall within that time window.
  *
- * The final partial km is included as the last entry.
+ * Only completed kilometres are included — the final partial km is omitted.
  */
 export function computeKmSplits(
   trackpoints: Trackpoint[],
@@ -54,23 +54,6 @@ export function computeKmSplits(
 
       splitStartTime = splitEndTime;
       nextKmBoundary += 1000;
-    }
-  }
-
-  // Final partial km
-  const lastTime = new Date(trackpoints[trackpoints.length - 1].created_at).getTime();
-  if (lastTime > splitStartTime) {
-    const seconds = (lastTime - splitStartTime) / 1000;
-    const avgBpm = averageBpmInWindow(pulses, pulseIdx, splitStartTime, lastTime);
-
-    // Only include if there's meaningful distance in this partial split
-    const partialDist = cumulativeDistance - (splits.length * 1000);
-    if (partialDist > 50) {
-      splits.push({
-        km: splits.length + 1,
-        seconds,
-        avgBpm,
-      });
     }
   }
 
