@@ -1,25 +1,18 @@
 import { useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
-import { TouchableOpacity } from 'react-native';
-import { AppleMaps } from 'expo-maps';
 import {
   getWorkoutById,
   getTrackpoints,
   getPulses,
-  type Trackpoint,
 } from '@/src/db/queries';
 import { trackpointDistance } from '@/src/utils/pace';
 import { computeKmSplits } from '@/src/utils/splits';
 import { filterReliableTrackpoints } from '@/src/utils/trackpointFilter';
-import {
-  formatDistance,
-  formatDuration,
-  formatPace,
-  formatBpm,
-  formatDate,
-} from '@/src/utils/format';
+import { formatDistance, formatDuration, formatDate } from '@/src/utils/format';
+import { KmSplitsTable } from '@/src/components/KmSplitsTable';
+import { RouteMap } from '@/src/components/RouteMap';
 
 export default function WorkoutDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -38,20 +31,8 @@ export default function WorkoutDetailScreen() {
 
     const splits = computeKmSplits(trackpoints, pulses);
 
-    return {
-      workout,
-      trackpoints,
-      distance,
-      elapsedSeconds,
-      splits,
-    };
+    return { workout, trackpoints, distance, elapsedSeconds, splits };
   }, [workoutId]);
-
-  // Compute map camera from trackpoint bounding box (must be before early return to satisfy hooks rules)
-  const mapCamera = useMemo(
-    () => (data ? computeCamera(data.trackpoints) : null),
-    [data],
-  );
 
   if (!data) {
     return (
@@ -84,99 +65,13 @@ export default function WorkoutDetailScreen() {
         </View>
 
         {/* Km splits */}
-        {splits.length > 0 && (
-          <View style={styles.splitsSection}>
-            <Text style={styles.splitsTitle}>Km Splits</Text>
-            <View style={styles.splitsHeader}>
-              <Text style={[styles.splitsHeaderCell, styles.kmCol]}>Km</Text>
-              <Text style={[styles.splitsHeaderCell, styles.timeCol]}>Time</Text>
-              <Text style={[styles.splitsHeaderCell, styles.bpmCol]}>Av BPM</Text>
-            </View>
-            {splits.map((split) => (
-              <View key={split.km} style={styles.splitsRow}>
-                <Text style={[styles.splitsCell, styles.kmCol]}>{split.km}</Text>
-                <Text style={[styles.splitsCell, styles.timeCol]}>
-                  {formatPace(split.seconds)}
-                </Text>
-                <Text style={[styles.splitsCell, styles.bpmCol]}>
-                  {formatBpm(split.avgBpm)}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
+        <KmSplitsTable splits={splits} />
+
         {/* Route map */}
-        {trackpoints.length >= 2 && mapCamera && (
-          <View style={styles.mapSection}>
-            <Text style={styles.splitsTitle}>Route</Text>
-            <View style={styles.mapContainer}>
-              <AppleMaps.View
-                style={styles.map}
-                cameraPosition={mapCamera}
-                polylines={[
-                  {
-                    coordinates: trackpoints.map((tp) => ({
-                      latitude: tp.lat,
-                      longitude: tp.lng,
-                    })),
-                    color: '#0A84FF',
-                    width: 3,
-                  },
-                ]}
-                properties={{
-                  isTrafficEnabled: false,
-                  pointsOfInterest: { including: [] },
-                }}
-                uiSettings={{
-                  compassEnabled: true,
-                  scaleBarEnabled: true,
-                }}
-              />
-            </View>
-          </View>
-        )}
+        <RouteMap trackpoints={trackpoints} />
       </ScrollView>
     </SafeAreaView>
   );
-}
-
-/**
- * Compute a camera position that fits the bounding box of the trackpoints.
- * Returns center coordinates and a zoom level estimated from the span.
- */
-function computeCamera(trackpoints: Trackpoint[]): {
-  coordinates: { latitude: number; longitude: number };
-  zoom: number;
-} | null {
-  if (trackpoints.length === 0) return null;
-
-  let minLat = Infinity, maxLat = -Infinity;
-  let minLng = Infinity, maxLng = -Infinity;
-
-  for (const tp of trackpoints) {
-    if (tp.lat < minLat) minLat = tp.lat;
-    if (tp.lat > maxLat) maxLat = tp.lat;
-    if (tp.lng < minLng) minLng = tp.lng;
-    if (tp.lng > maxLng) maxLng = tp.lng;
-  }
-
-  const midLat = (minLat + maxLat) / 2;
-  const midLng = (minLng + maxLng) / 2;
-
-  // Estimate zoom from the larger span dimension (in degrees)
-  // Add padding so the track doesn't touch the edges
-  const latSpan = (maxLat - minLat) * 1.3;
-  const lngSpan = (maxLng - minLng) * 1.3;
-  const span = Math.max(latSpan, lngSpan, 0.002); // minimum span
-
-  // Rough mapping: zoom ~14 for 0.02 degrees, ~12 for 0.08, ~10 for 0.3
-  // Formula: zoom ≈ log2(360 / span) + small offset for padding
-  const zoom = Math.max(8, Math.min(18, Math.log2(360 / span) + 1.5));
-
-  return {
-    coordinates: { latitude: midLat, longitude: midLng },
-    zoom,
-  };
 }
 
 function StatCell({ label, value }: { label: string; value: string }) {
@@ -223,10 +118,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   headerSpacer: {
-    width: 50, // Balance the back button
+    width: 50,
   },
 
-  // Stats grid (matches LiveStats)
+  // Stats grid
   grid: {
     gap: 2,
     marginHorizontal: 16,
@@ -256,66 +151,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
-  },
-
-  // Splits
-  splitsSection: {
-    marginTop: 24,
-    marginHorizontal: 16,
-  },
-  splitsTitle: {
-    fontSize: 15,
-    color: '#FFFFFF',
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  splitsHeader: {
-    flexDirection: 'row',
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#38383A',
-  },
-  splitsHeaderCell: {
-    fontSize: 12,
-    color: '#8E8E93',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  splitsRow: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#2C2C2E',
-  },
-  splitsCell: {
-    fontSize: 15,
-    color: '#FFFFFF',
-    fontVariant: ['tabular-nums'],
-  },
-  kmCol: {
-    width: 50,
-  },
-  timeCol: {
-    flex: 1,
-    textAlign: 'right',
-  },
-  bpmCol: {
-    width: 80,
-    textAlign: 'right',
-  },
-
-  // Map
-  mapSection: {
-    marginTop: 24,
-    marginHorizontal: 16,
-  },
-  mapContainer: {
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  map: {
-    height: 350,
-    width: '100%',
   },
 });

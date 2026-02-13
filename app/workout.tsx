@@ -1,8 +1,7 @@
-import { useState } from 'react';
-import { Alert, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useState, useEffect } from 'react';
+import { Alert, View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import { useEffect } from 'react';
 import { useWorkoutRecording } from '@/src/hooks/useWorkoutRecording';
 import { useWorkoutStats } from '@/src/hooks/useWorkoutStats';
 import { useHeartRate } from '@/src/hooks/useHeartRate';
@@ -11,6 +10,8 @@ import { GpsStatusIndicator } from '@/src/components/GpsStatus';
 import { HrStatusIndicator } from '@/src/components/HrStatus';
 import { BackupStatusIndicator } from '@/src/components/BackupStatus';
 import { BleDevicePicker } from '@/src/components/BleDevicePicker';
+import { KmSplitsTable } from '@/src/components/KmSplitsTable';
+import { RouteMap } from '@/src/components/RouteMap';
 import { useBackupStatus } from '@/src/hooks/useBackupStatus';
 
 export default function WorkoutScreen() {
@@ -88,35 +89,43 @@ export default function WorkoutScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Status indicators */}
-      <View style={styles.statusRow}>
-        <GpsStatusIndicator />
-        <HrStatusIndicator
-          connectionState={hr.connectionState}
-          currentBpm={hr.currentBpm}
-          onPress={() => setShowBlePicker(true)}
-        />
-        <BackupStatusIndicator
-          status={backupStatus}
-          onPress={() => {}}
-        />
-      </View>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        {/* Status indicators */}
+        <View style={styles.statusRow}>
+          <GpsStatusIndicator />
+          <HrStatusIndicator
+            connectionState={hr.connectionState}
+            currentBpm={hr.currentBpm}
+            onPress={() => setShowBlePicker(true)}
+          />
+          <BackupStatusIndicator
+            status={backupStatus}
+            onPress={() => {}}
+          />
+        </View>
 
-      {/* Live stats grid */}
-      <View style={styles.statsContainer}>
-        <LiveStats stats={stats} />
-      </View>
+        {/* Stop button — at top so it's always reachable */}
+        <View style={styles.stopSection}>
+          <TouchableOpacity
+            style={styles.stopButton}
+            onPress={handleStop}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.stopButtonText}>Stop</Text>
+          </TouchableOpacity>
+        </View>
 
-      {/* Stop button */}
-      <View style={styles.bottomSection}>
-        <TouchableOpacity
-          style={styles.stopButton}
-          onPress={handleStop}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.stopButtonText}>Stop</Text>
-        </TouchableOpacity>
-      </View>
+        {/* Live stats grid */}
+        <View style={styles.statsContainer}>
+          <LiveStats stats={stats} />
+        </View>
+
+        {/* Km splits */}
+        <KmSplitsTable splits={stats.splits} />
+
+        {/* Route map */}
+        <RouteMap trackpoints={stats.trackpoints} />
+      </ScrollView>
 
       {/* BLE device picker modal */}
       <BleDevicePicker
@@ -139,19 +148,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
   },
+  scroll: {
+    paddingBottom: 40,
+  },
   statusRow: {
     flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  statsContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  stopSection: {
     paddingHorizontal: 16,
-  },
-  bottomSection: {
-    paddingHorizontal: 16,
-    paddingBottom: 20,
+    paddingBottom: 16,
   },
   stopButton: {
     backgroundColor: '#EF4444',
@@ -163,6 +170,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 22,
     fontWeight: '700',
+  },
+  statsContainer: {
+    paddingHorizontal: 16,
   },
   noWorkoutText: {
     color: '#8E8E93',

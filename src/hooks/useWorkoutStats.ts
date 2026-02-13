@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   getTrackpoints,
+  getPulses,
   getRecentAvgBpm,
+  type Trackpoint,
 } from '@/src/db/queries';
 import { paceOverWindow, trackpointDistance } from '@/src/utils/pace';
 import { filterReliableTrackpoints } from '@/src/utils/trackpointFilter';
+import { computeKmSplits, type KmSplit } from '@/src/utils/splits';
 
 export type WorkoutStats = {
   distance: number; // metres
@@ -13,6 +16,8 @@ export type WorkoutStats = {
   pace1000m: number | null; // sec per km, from last 1000m
   bpm5s: number | null;
   bpm60s: number | null;
+  trackpoints: Trackpoint[]; // filtered reliable trackpoints
+  splits: KmSplit[];
 };
 
 const EMPTY_STATS: WorkoutStats = {
@@ -22,6 +27,8 @@ const EMPTY_STATS: WorkoutStats = {
   pace1000m: null,
   bpm5s: null,
   bpm60s: null,
+  trackpoints: [],
+  splits: [],
 };
 
 /**
@@ -57,6 +64,9 @@ export function useWorkoutStats(
         const bpm5s = getRecentAvgBpm(workoutId, 5);
         const bpm60s = getRecentAvgBpm(workoutId, 60);
 
+        const pulses = getPulses(workoutId);
+        const splits = computeKmSplits(trackpoints, pulses);
+
         setStats({
           distance,
           elapsedSeconds,
@@ -64,6 +74,8 @@ export function useWorkoutStats(
           pace1000m,
           bpm5s,
           bpm60s,
+          trackpoints,
+          splits,
         });
       } catch (err) {
         console.error('[Stats] Failed to compute:', err);

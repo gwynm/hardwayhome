@@ -40,7 +40,8 @@ export function formatBpm(bpm: number | null | undefined): string {
 }
 
 /**
- * Format an ISO date string as a short date: "13 Feb" or "13 Feb 2025".
+ * Format an ISO date string as a short date with time: "13 Feb 14:02".
+ * Includes year if not the current year: "13 Feb 2025 14:02".
  */
 export function formatDate(isoString: string): string {
   const date = new Date(isoString);
@@ -48,8 +49,11 @@ export function formatDate(isoString: string): string {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const day = date.getDate();
   const month = months[date.getMonth()];
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  const time = `${hours}:${minutes}`;
   if (date.getFullYear() === now.getFullYear()) {
-    return `${day} ${month}`;
+    return `${day} ${month} ${time}`;
   }
-  return `${day} ${month} ${date.getFullYear()}`;
+  return `${day} ${month} ${date.getFullYear()} ${time}`;
 }
