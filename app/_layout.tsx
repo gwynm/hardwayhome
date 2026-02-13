@@ -3,7 +3,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { getDatabase } from '@/src/db/database';
-import { getActiveWorkout } from '@/src/db/queries';
+import { getActiveWorkout, kvGet, kvSet } from '@/src/db/queries';
 import { requestLocationPermissions } from '@/src/services/location';
 import { requestBlePermission, reconnectToLastDevice } from '@/src/services/heartrate';
 import { initBackupStatus } from '@/src/services/backup';
@@ -39,12 +39,19 @@ export default function RootLayout() {
       reconnectToLastDevice().catch(() => {});
 
 
-      // Check for active workout and navigate accordingly
-      const activeWorkout = getActiveWorkout();
-      if (activeWorkout) {
-        setTimeout(() => {
-          router.replace('/workout');
-        }, 0);
+      // Dev: screenshot automation — navigate to a specific route if flag is set
+      const screenshotNav = kvGet('screenshot_nav');
+      if (screenshotNav) {
+        kvSet('screenshot_nav', '');
+        setTimeout(() => router.push(screenshotNav as any), 0);
+      } else {
+        // Check for active workout and navigate accordingly
+        const activeWorkout = getActiveWorkout();
+        if (activeWorkout) {
+          setTimeout(() => {
+            router.replace('/workout');
+          }, 0);
+        }
       }
 
       setIsReady(true);
