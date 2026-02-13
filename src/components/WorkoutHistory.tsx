@@ -1,4 +1,5 @@
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { router } from 'expo-router';
 import type { Workout } from '@/src/db/queries';
 import { formatDate, formatDistance, formatPace, formatBpm } from '@/src/utils/format';
 
@@ -25,7 +26,12 @@ export function WorkoutHistory({ workouts }: Props) {
       </View>
       <ScrollView>
         {workouts.map((w) => (
-          <View key={w.id} style={styles.row}>
+          <TouchableOpacity
+            key={w.id}
+            style={styles.row}
+            activeOpacity={0.6}
+            onPress={() => router.push({ pathname: '/workout-detail', params: { id: w.id } })}
+          >
             <Text style={[styles.cell, styles.dateCol]}>
               {formatDate(w.started_at)}
             </Text>
@@ -38,7 +44,7 @@ export function WorkoutHistory({ workouts }: Props) {
             <Text style={[styles.cell, styles.bpmCol]}>
               {formatBpm(w.avg_bpm)}
             </Text>
-          </View>
+          </TouchableOpacity>
         ))}
       </ScrollView>
     </View>

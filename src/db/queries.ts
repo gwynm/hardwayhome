@@ -102,6 +102,15 @@ export function deleteWorkout(workoutId: number, db?: SQLiteDatabase): void {
   d.runSync('DELETE FROM workouts WHERE id = ?', workoutId);
 }
 
+/** Get a single workout by ID. */
+export function getWorkoutById(workoutId: number, db?: SQLiteDatabase): Workout | null {
+  const d = db ?? getDatabase();
+  return d.getFirstSync<Workout>(
+    'SELECT * FROM workouts WHERE id = ?',
+    workoutId
+  );
+}
+
 /** Get all finished workouts, newest first. */
 export function getWorkoutHistory(db?: SQLiteDatabase): Workout[] {
   const d = db ?? getDatabase();
@@ -176,6 +185,18 @@ export function insertPulse(
     workoutId,
     now,
     bpm
+  );
+}
+
+/** Get all pulse readings for a workout, ordered by time. */
+export function getPulses(
+  workoutId: number,
+  db?: SQLiteDatabase
+): Pulse[] {
+  const d = db ?? getDatabase();
+  return d.getAllSync<Pulse>(
+    'SELECT * FROM pulses WHERE workout_id = ? ORDER BY created_at ASC',
+    workoutId
   );
 }
 

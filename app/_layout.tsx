@@ -67,6 +67,7 @@ export default function RootLayout() {
           }}
         />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="workout-detail" />
       </Stack>
       <StatusBar style="light" />
     </>
