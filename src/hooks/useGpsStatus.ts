@@ -1,14 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import * as Location from 'expo-location';
 import { watchLocation } from '@/src/services/location';
+import { GPS_ERR_THRESHOLD } from '@/src/utils/trackpointFilter';
 
 export type GpsStatus = 'none' | 'poor' | 'good';
 
 /**
  * Returns the current GPS fix quality and accuracy in metres.
- * - 'none': no fix or accuracy > 50m
- * - 'poor': accuracy > 10m
- * - 'good': accuracy <= 10m
+ * Thresholds match the trackpoint filter so the indicator reflects
+ * whether incoming points are being used in calculations:
+ * - 'good': accuracy < GPS_ERR_THRESHOLD (green — included)
+ * - 'poor': accuracy >= GPS_ERR_THRESHOLD (yellow — excluded)
+ * - 'none': no fix / null accuracy (red)
  */
 export function useGpsStatus(): { status: GpsStatus; accuracy: number | null } {
   const [status, setStatus] = useState<GpsStatus>('none');
@@ -30,9 +33,9 @@ export function useGpsStatus(): { status: GpsStatus; accuracy: number | null } {
         const acc = location.coords.accuracy ?? null;
         setAccuracy(acc);
 
-        if (acc == null || acc > 50) {
+        if (acc == null) {
           setStatus('none');
-        } else if (acc > 10) {
+        } else if (acc >= GPS_ERR_THRESHOLD) {
           setStatus('poor');
         } else {
           setStatus('good');

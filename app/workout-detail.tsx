@@ -10,9 +10,9 @@ import {
   getPulses,
   type Trackpoint,
 } from '@/src/db/queries';
-import { trackpointDistance } from '@/src/utils/pace';
-import { paceOverWindow } from '@/src/utils/pace';
+import { trackpointDistance, paceOverWindow } from '@/src/utils/pace';
 import { computeKmSplits } from '@/src/utils/splits';
+import { filterReliableTrackpoints } from '@/src/utils/trackpointFilter';
 import {
   formatDistance,
   formatDuration,
@@ -29,7 +29,7 @@ export default function WorkoutDetailScreen() {
     const workout = getWorkoutById(workoutId);
     if (!workout || !workout.finished_at) return null;
 
-    const trackpoints = getTrackpoints(workoutId);
+    const trackpoints = filterReliableTrackpoints(getTrackpoints(workoutId));
     const pulses = getPulses(workoutId);
     const distance = trackpointDistance(trackpoints);
     const startMs = new Date(workout.started_at).getTime();

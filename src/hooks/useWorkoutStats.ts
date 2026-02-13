@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import {
   getTrackpoints,
   getRecentAvgBpm,
-  type Trackpoint,
 } from '@/src/db/queries';
 import { paceOverWindow, trackpointDistance } from '@/src/utils/pace';
+import { filterReliableTrackpoints } from '@/src/utils/trackpointFilter';
 
 export type WorkoutStats = {
   distance: number; // metres
@@ -43,7 +43,8 @@ export function useWorkoutStats(
 
     const compute = () => {
       try {
-        const trackpoints = getTrackpoints(workoutId);
+        const allTrackpoints = getTrackpoints(workoutId);
+        const trackpoints = filterReliableTrackpoints(allTrackpoints);
         const distance = trackpointDistance(trackpoints);
 
         const now = Date.now();

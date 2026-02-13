@@ -1,5 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { getDatabase } from './database';
+import { haversineMetres } from '@/src/utils/distance';
+import { filterReliableTrackpoints } from '@/src/utils/trackpointFilter';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -55,8 +57,9 @@ export function finishWorkout(workoutId: number, db?: SQLiteDatabase): void {
   const d = db ?? getDatabase();
   const now = new Date().toISOString();
 
-  // Compute distance from trackpoints using JS haversine
-  const trackpoints = getTrackpoints(workoutId, d);
+  // Filter to reliable trackpoints, then compute distance
+  const allTrackpoints = getTrackpoints(workoutId, d);
+  const trackpoints = filterReliableTrackpoints(allTrackpoints);
   let distance = 0;
   for (let i = 1; i < trackpoints.length; i++) {
     distance += haversineMetres(
@@ -67,7 +70,7 @@ export function finishWorkout(workoutId: number, db?: SQLiteDatabase): void {
     );
   }
 
-  // Compute average pace
+  // Compute average pace from reliable trackpoints
   let avgSecPerKm: number | null = null;
   if (distance > 0 && trackpoints.length >= 2) {
     const startTime = new Date(trackpoints[0].created_at).getTime();
@@ -236,20 +239,3 @@ export function kvSet(key: string, value: string, db?: SQLiteDatabase): void {
   );
 }
 
-// ─── Haversine helper ────────────────────────────────────────────────
-
-function haversineMetres(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number
-): number {
-  const R = 6371000; // Earth radius in metres
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
