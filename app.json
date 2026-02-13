@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.hardwayhome.app",
+      "bundleIdentifier": "com.gwynmorfey.hardwayhome.app",
       "infoPlist": {
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Hard Way Home tracks your location during workouts to calculate distance and pace.",
         "NSLocationWhenInUseUsageDescription": "Hard Way Home tracks your location during workouts to calculate distance and pace.",
@@ -18,8 +18,11 @@
         "UIBackgroundModes": [
           "location",
           "bluetooth-central"
-        ]
-      }
+        ],
+        "UIFileSharingEnabled": true,
+        "LSSupportsOpeningDocumentsInPlace": true
+      },
+      "appleTeamId": "ZBH4BELMH2"
     },
     "plugins": [
       "expo-router",
@@ -43,7 +46,9 @@
         "react-native-ble-plx",
         {
           "isBackgroundEnabled": true,
-          "modes": ["central"],
+          "modes": [
+            "central"
+          ],
           "bluetoothAlwaysPermission": "Hard Way Home connects to your heart rate monitor during workouts."
         }
       ],

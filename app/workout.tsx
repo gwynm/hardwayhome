@@ -9,7 +9,9 @@ import { useHeartRate } from '@/src/hooks/useHeartRate';
 import { LiveStats } from '@/src/components/LiveStats';
 import { GpsStatusIndicator } from '@/src/components/GpsStatus';
 import { HrStatusIndicator } from '@/src/components/HrStatus';
+import { BackupStatusIndicator } from '@/src/components/BackupStatus';
 import { BleDevicePicker } from '@/src/components/BleDevicePicker';
+import { useBackupStatus } from '@/src/hooks/useBackupStatus';
 
 export default function WorkoutScreen() {
   const [showBlePicker, setShowBlePicker] = useState(false);
@@ -19,6 +21,7 @@ export default function WorkoutScreen() {
     activeWorkout?.started_at ?? null
   );
   const hr = useHeartRate();
+  const backupStatus = useBackupStatus();
 
   // Keep the screen awake during workouts
   useEffect(() => {
@@ -77,6 +80,10 @@ export default function WorkoutScreen() {
           connectionState={hr.connectionState}
           currentBpm={hr.currentBpm}
           onPress={() => setShowBlePicker(true)}
+        />
+        <BackupStatusIndicator
+          status={backupStatus}
+          onPress={() => {}}
         />
       </View>
 

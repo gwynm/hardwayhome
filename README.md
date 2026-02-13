@@ -8,7 +8,7 @@ A personal fitness tracker for iOS. Prioritises simplicity and reliability.
 - **Database**: expo-sqlite (WAL mode)
 - **GPS**: expo-location + expo-task-manager (background tracking)
 - **Heart Rate**: react-native-ble-plx (BLE HRM, background mode)
-- **Backup**: expo-file-system (local backup post-workout; iCloud Documents planned)
+- **Backup**: WebDAV (HTTP PUT to user-configured server, local fallback via expo-file-system)
 
 Requires a development build — Expo Go won't work due to BLE native modules.
 
@@ -86,6 +86,8 @@ The app auto-reconnects every 10 seconds for up to 5 minutes. Pulse data will ha
 
 - GPS status indicator (red/yellow/green based on accuracy)
 - Heart rate monitor status (tap to open BLE device picker)
+- Backup status indicator (grey=not configured, yellow=uploading, green=ok, red=failed; tap to open settings)
+- Settings gear button (top-right)
 - Start button
 - Workout history table: Date, Distance, Av Pace, Av BPM
 
@@ -98,9 +100,40 @@ Live stats grid (polled at 1Hz):
 
 Stop button → confirmation: "Finish & Save", "Finish & Delete", "Cancel"
 
+### Settings
+
+Accessible via the gear icon on the home screen. Configures remote backup:
+
+- **WebDAV URL**: Full URL including path, e.g. `https://mywebdav.example/hardwayhome/backups`
+- **Username**: WebDAV username (HTTP Basic auth)
+- **Password**: WebDAV password
+- **Test Connection**: Sends an OPTIONS request to verify the server responds
+- Settings are stored in the SQLite KV table and persist across app restarts
+
 ### Backup
 
-Post-workout, the SQLite database is copied to the app's documents directory. Files are accessible via Files.app > On My iPhone > Hard Way Home. iCloud Documents sync is planned.
+After each workout, the SQLite database is backed up in two ways:
+
+1. **Local**: Always copies to the app's Documents directory (Files.app → On My iPhone → Hard Way Home → backups/). The last 10 backups are kept.
+
+2. **Remote (WebDAV)**: If configured in Settings, uploads the database via HTTP PUT to the configured URL. The filename is `hardwayhome-{timestamp}.sqlite`.
+
+The backup status indicator on the home and workout screens shows:
+- Grey (`☁ --`): WebDAV not configured
+- Yellow (`☁ ...`): Upload in progress
+- Green (`☁ ✓`): Last backup succeeded
+- Red (`☁ ✕`): Last backup failed
+
+Backups are `.sqlite` files. Open them with any SQLite client (`sqlite3`, DB Browser for SQLite, TablePlus, etc.).
+
+#### Server setup
+
+Any WebDAV server that accepts HTTP PUT with Bearer token auth will work. Examples:
+
+- Apache with `mod_dav` + `mod_authn_bearer`
+- Nginx with `dav_ext_module`
+- `rclone serve webdav`
+- Nextcloud/ownCloud (built-in WebDAV)
 
 ## Development
 
@@ -131,6 +164,7 @@ app/
   _layout.tsx              Root layout, DB init, workout resume, task registration
   index.tsx                Home screen
   workout.tsx              Workout in progress screen
+  settings.tsx             Settings screen (WebDAV backup config)
 
 src/
   db/
@@ -140,15 +174,17 @@ src/
   services/
     location.ts            Background location task + foreground tracking
     heartrate.ts           BLE scan, connect, HR notifications, state restoration
-    backup.ts              Post-workout database backup
+    backup.ts              WebDAV upload + local backup + status tracking
   hooks/
     useGpsStatus.ts        GPS fix quality (red/yellow/green)
     useHeartRate.ts        BLE connection state + live BPM
+    useBackupStatus.ts     Backup status (listener pattern)
     useWorkoutRecording.ts Start/stop/resume orchestration
     useWorkoutStats.ts     Live stats from SQLite polling
   components/
     GpsStatus.tsx          GPS status pill
     HrStatus.tsx           HR status pill
+    BackupStatus.tsx       Backup status pill
     BleDevicePicker.tsx    Modal: scan + connect HRM
     WorkoutHistory.tsx     Scrollable workout table
     LiveStats.tsx          2x3 stat grid

@@ -6,13 +6,15 @@ import {
   StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, router } from 'expo-router';
 import { getWorkoutHistory, type Workout } from '@/src/db/queries';
 import { useGpsStatus } from '@/src/hooks/useGpsStatus';
 import { useHeartRate } from '@/src/hooks/useHeartRate';
 import { useWorkoutRecording } from '@/src/hooks/useWorkoutRecording';
+import { useBackupStatus } from '@/src/hooks/useBackupStatus';
 import { GpsStatusIndicator } from '@/src/components/GpsStatus';
 import { HrStatusIndicator } from '@/src/components/HrStatus';
+import { BackupStatusIndicator } from '@/src/components/BackupStatus';
 import { BleDevicePicker } from '@/src/components/BleDevicePicker';
 import { WorkoutHistory } from '@/src/components/WorkoutHistory';
 
@@ -21,8 +23,8 @@ export default function HomeScreen() {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const { start } = useWorkoutRecording();
   const hr = useHeartRate();
+  const backupStatus = useBackupStatus();
 
-  // Reload workout history whenever screen gains focus
   useFocusEffect(
     useCallback(() => {
       setWorkouts(getWorkoutHistory());
@@ -39,6 +41,14 @@ export default function HomeScreen() {
           currentBpm={hr.currentBpm}
           onPress={() => setShowBlePicker(true)}
         />
+        <BackupStatusIndicator
+          status={backupStatus}
+          onPress={() => router.push('/settings')}
+        />
+        <View style={styles.spacer} />
+        <TouchableOpacity onPress={() => router.push('/settings')} activeOpacity={0.7}>
+          <Text style={styles.settingsButton}>⚙</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Start button */}
@@ -49,7 +59,7 @@ export default function HomeScreen() {
       {/* Workout history */}
       <WorkoutHistory workouts={workouts} />
 
-      {/* BLE device picker modal */}
+      {/* BLE picker modal */}
       <BleDevicePicker
         visible={showBlePicker}
         onClose={() => setShowBlePicker(false)}
@@ -72,8 +82,16 @@ const styles = StyleSheet.create({
   },
   statusRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  spacer: {
+    flex: 1,
+  },
+  settingsButton: {
+    fontSize: 22,
+    color: '#8E8E93',
   },
   startButton: {
     backgroundColor: '#22C55E',

@@ -6,6 +6,7 @@ import { getDatabase } from '@/src/db/database';
 import { getActiveWorkout } from '@/src/db/queries';
 import { requestLocationPermissions } from '@/src/services/location';
 import { requestBlePermission } from '@/src/services/heartrate';
+import { initBackupStatus } from '@/src/services/backup';
 
 // Import location service to register the background task at module scope.
 // This MUST happen at the top level of the root layout so it runs on
@@ -28,6 +29,9 @@ export default function RootLayout() {
         requestLocationPermissions(),
         requestBlePermission(),
       ]);
+
+      // Initialize backup status from stored config
+      initBackupStatus();
 
       // Check for active workout and navigate accordingly
       const activeWorkout = getActiveWorkout();
@@ -62,6 +66,7 @@ export default function RootLayout() {
             gestureEnabled: false, // Prevent accidental swipe-back during workout
           }}
         />
+        <Stack.Screen name="settings" />
       </Stack>
       <StatusBar style="light" />
     </>
