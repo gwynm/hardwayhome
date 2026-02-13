@@ -1,8 +1,48 @@
 # Hard Way Home
 
-A personal fitness tracker for iOS. Prioritises simplicity and reliability.
+A lightweight run tracker for iOS
+
+## Features
+
+### Quiet
+* No popups
+* No subscriptions
+* No AI
+* No social features
+* No animations
+* No update treadmill
+* Only two screens, only one important button
+
+### Functional
+* Heart-rate tracking, auto-reconnect, no faff
+* Filters GPS track to reduce random noise
+* Shows 1km split times
+
+### Reliable
+* Shows heart-rate monitor and gps state front-and-center
+* Runs in background, but will recover a workout-in-progress if needed
+
+### Yours
+* No spying (data stays on device, or syncs to your webdav server)
+* Open source
+* Simple, open data format (Sqlite, 3 tables)
+
+## Screenshots
+
 
 ## Tech
+
+Yep, built by robots (with guidance, but without review). Seems to work, but I wouldn't trust your life to this.
+
+## Getting Going
+
+Plug your phone in, do scripts/deploy.sh 
+
+## More info
+
+(Partially written by robots below this point)
+
+### Tech
 
 - **Framework**: Expo SDK 54, TypeScript, Expo Router
 - **Database**: expo-sqlite (WAL mode)
@@ -12,7 +52,7 @@ A personal fitness tracker for iOS. Prioritises simplicity and reliability.
 
 Requires a development build — Expo Go won't work due to BLE native modules.
 
-## Data Model
+### Data Model
 
 No user login. All data is local SQLite.
 
@@ -29,11 +69,11 @@ No user login. All data is local SQLite.
 **KV** (app settings)
 - key, value (stores connected BLE device ID, etc.)
 
-## Architecture
+### Architecture
 
 SQLite is the single source of truth. The app is a UI layer on top of the database — all workout state lives in SQL, never in React state. This is critical for reliability.
 
-### Background Tracking
+#### Background Tracking
 
 During a workout, two systems write data independently:
 
@@ -43,19 +83,19 @@ During a workout, two systems write data independently:
 
 The Workout screen polls SQLite at ~1Hz to compute live stats.
 
-### Workout Resume
+#### Workout Resume
 
 A workout is "active" if `started_at IS NOT NULL AND finished_at IS NULL`. On every app launch, the root layout checks for an active workout and navigates directly to the Workout screen if one exists. Background tracking is re-started if not already running, and BLE reconnection is attempted using the stored device ID.
 
-### Known Limitations
+#### Known Limitations
 
 - **Force-quit**: If the user swipes the app away in the app switcher, iOS stops all background activity. Data has a gap until the app is reopened.
 - **Low Power Mode**: iOS may reduce background location frequency.
 - **BLE reliability**: Less reliable than GPS in background. HR data may have gaps after disconnections. The app tolerates this gracefully.
 
-## BLE Heart Rate Monitors
+### BLE Heart Rate Monitors
 
-### Do I need to pair in iOS Bluetooth settings?
+#### Do I need to pair in iOS Bluetooth settings?
 
 No. BLE (Bluetooth Low Energy) heart rate monitors like Polar Sense / Verity Sense / H10, Garmin HRM-Dual, Wahoo TICKR, etc. do **not** need to be paired at the OS level. In fact, **you should not pair them in Settings > Bluetooth**.
 
@@ -63,26 +103,26 @@ BLE devices work differently from Classic Bluetooth devices (headphones, speaker
 
 If you do pair a BLE HRM in iOS Settings, iOS may hold onto the connection and interfere with apps trying to connect. If you're having trouble, go to Settings > Bluetooth, find the device, tap the (i) button, and choose "Forget This Device", then connect from within the app.
 
-### How connection works in this app
+#### How connection works in this app
 
 1. **Tap the heart icon** (red ✕ = disconnected) on either the home screen or workout screen
 2. The BLE picker opens and **scans for HR monitors** broadcasting the standard Heart Rate Service (UUID 0x180D)
 3. Tap a device to connect. The app subscribes to HR notifications and starts receiving BPM
 4. The device ID is **saved locally** so the app can auto-reconnect on future launches
 
-### Can other apps interfere?
+#### Can other apps interfere?
 
 No. iOS proxies all BLE connections through CoreBluetooth. The OS maintains a single physical connection to the peripheral and multiplexes it to every app that requests access. From the HR monitor's perspective, there is only one connection — iOS handles the fan-out internally. So this app, Strava, Peloton, etc. can all receive HR data from the same device simultaneously without conflict.
 
 The only scenario where connection limits matter is **cross-device**: e.g., an iPhone and an Android phone (or a Garmin watch acting as its own BLE central) both trying to connect to the same HR strap. Most modern HRMs support 2–3 concurrent physical connections, so even this is rarely an issue.
 
-### What if the monitor disconnects mid-workout?
+#### What if the monitor disconnects mid-workout?
 
 The app auto-reconnects every 10 seconds for up to 5 minutes. Pulse data will have a gap for the disconnected period. GPS tracking is unaffected — it runs independently.
 
-## Features
+### Features
 
-### Home Screen
+#### Home Screen
 
 - GPS status indicator (red/yellow/green based on accuracy)
 - Heart rate monitor status (tap to open BLE device picker)
@@ -91,7 +131,7 @@ The app auto-reconnects every 10 seconds for up to 5 minutes. Pulse data will ha
 - Start button
 - Workout history table: Date, Distance, Av Pace, Av BPM
 
-### Workout In Progress Screen
+#### Workout In Progress Screen
 
 Live stats grid (polled at 1Hz):
 - Distance / Time
@@ -100,7 +140,7 @@ Live stats grid (polled at 1Hz):
 
 Stop button → confirmation: "Finish & Save", "Finish & Delete", "Cancel"
 
-### Settings
+#### Settings
 
 Accessible via the gear icon on the home screen. Configures remote backup:
 
@@ -110,7 +150,7 @@ Accessible via the gear icon on the home screen. Configures remote backup:
 - **Test Connection**: Sends an OPTIONS request to verify the server responds
 - Settings are stored in the SQLite KV table and persist across app restarts
 
-### Backup
+#### Backup
 
 After each workout, the SQLite database is backed up in two ways:
 
@@ -126,7 +166,7 @@ The backup status indicator on the home and workout screens shows:
 
 Backups are `.sqlite` files. Open them with any SQLite client (`sqlite3`, DB Browser for SQLite, TablePlus, etc.).
 
-#### Server setup
+##### Server setup
 
 Any WebDAV server that accepts HTTP PUT with Bearer token auth will work. Examples:
 
@@ -135,7 +175,7 @@ Any WebDAV server that accepts HTTP PUT with Bearer token auth will work. Exampl
 - `rclone serve webdav`
 - Nextcloud/ownCloud (built-in WebDAV)
 
-## Development
+### Development
 
 ```bash
 # Install dependencies
@@ -148,7 +188,7 @@ npm start
 npm run ios:device
 ```
 
-### Distribution
+#### Distribution
 
 ```bash
 # Test, build, and install on connected device
@@ -157,7 +197,7 @@ npm run ios:device
 
 Requires: Mac, USB cable, Apple Developer account, device registered in provisioning profile.
 
-## Project Structure
+### Project Structure
 
 ```
 app/
