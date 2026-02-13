@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import {
   KV_WEBDAV_URL,
   KV_WEBDAV_USERNAME,
   KV_WEBDAV_PASSWORD,
-  testWebdavConnection,
+  backupWithLogs,
   initBackupStatus,
 } from '@/src/services/backup';
 
@@ -26,8 +26,10 @@ export default function SettingsScreen() {
   const [url, setUrl] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [isTesting, setIsTesting] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [logs, setLogs] = useState<string[]>([]);
+  const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     setUrl(kvGet(KV_WEBDAV_URL) || '');
@@ -40,29 +42,35 @@ export default function SettingsScreen() {
     kvSet(KV_WEBDAV_USERNAME, username.trim());
     kvSet(KV_WEBDAV_PASSWORD, password);
 
-    // Re-evaluate backup status
     initBackupStatus();
 
     setHasChanges(false);
     Alert.alert('Saved', 'Backup settings updated.');
   };
 
-  const handleTest = async () => {
-    const trimmedUrl = url.trim();
-    if (!trimmedUrl) {
-      Alert.alert('No URL', 'Enter a WebDAV URL first.');
-      return;
-    }
+  const handleBackupNow = async () => {
+    // Save current values first so the backup uses them
+    kvSet(KV_WEBDAV_URL, url.trim());
+    kvSet(KV_WEBDAV_USERNAME, username.trim());
+    kvSet(KV_WEBDAV_PASSWORD, password);
+    initBackupStatus();
+    setHasChanges(false);
 
-    setIsTesting(true);
-    const ok = await testWebdavConnection(trimmedUrl, username.trim() || null, password || null);
-    setIsTesting(false);
+    setLogs([]);
+    setIsRunning(true);
 
-    if (ok) {
-      Alert.alert('Success', 'WebDAV server responded OK.');
-    } else {
-      Alert.alert('Failed', 'Could not reach the WebDAV server. Check the URL and token.');
-    }
+    await backupWithLogs(
+      url.trim(),
+      username.trim() || null,
+      password || null,
+      (line) => {
+        setLogs((prev) => [...prev, line]);
+        // Scroll to bottom after each log line
+        setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+      },
+    );
+
+    setIsRunning(false);
   };
 
   const handleClear = () => {
@@ -78,6 +86,7 @@ export default function SettingsScreen() {
             setUrl('');
             setUsername('');
             setPassword('');
+            setLogs([]);
             kvSet(KV_WEBDAV_URL, '');
             kvSet(KV_WEBDAV_USERNAME, '');
             kvSet(KV_WEBDAV_PASSWORD, '');
@@ -94,7 +103,11 @@ export default function SettingsScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flex}
       >
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity onPress={() => router.back()}>
@@ -150,25 +163,46 @@ export default function SettingsScreen() {
           {/* Buttons */}
           <View style={styles.buttonRow}>
             <TouchableOpacity
-              style={[styles.button, styles.testButton]}
-              onPress={handleTest}
-              disabled={isTesting}
+              style={[styles.button, styles.backupButton]}
+              onPress={handleBackupNow}
+              disabled={isRunning}
             >
-              {isTesting ? (
+              {isRunning ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
-                <Text style={styles.buttonText}>Test Connection</Text>
+                <Text style={styles.buttonText}>Backup Now</Text>
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.button, styles.saveButton, !hasChanges && styles.buttonDisabled]}
-              onPress={handleSave}
-              disabled={!hasChanges}
-            >
-              <Text style={styles.buttonText}>Save</Text>
-            </TouchableOpacity>
+            {hasChanges && (
+              <TouchableOpacity
+                style={[styles.button, styles.saveButton]}
+                onPress={handleSave}
+              >
+                <Text style={styles.buttonText}>Save</Text>
+              </TouchableOpacity>
+            )}
           </View>
+
+          {/* Log output */}
+          {logs.length > 0 && (
+            <View style={styles.logContainer}>
+              <Text style={styles.logTitle}>BACKUP LOG</Text>
+              {logs.map((line, i) => (
+                <Text
+                  key={i}
+                  style={[
+                    styles.logLine,
+                    line.startsWith('ERROR') && styles.logError,
+                    line.startsWith('FAILED') && styles.logError,
+                    line === 'SUCCESS' && styles.logSuccess,
+                  ]}
+                >
+                  {line}
+                </Text>
+              ))}
+            </View>
+          )}
 
           {url.trim() !== '' && (
             <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
@@ -191,6 +225,7 @@ const styles = StyleSheet.create({
   },
   scroll: {
     padding: 16,
+    paddingBottom: 40,
   },
   header: {
     flexDirection: 'row',
@@ -250,19 +285,42 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
   },
-  testButton: {
-    backgroundColor: '#2C2C2E',
-  },
-  saveButton: {
+  backupButton: {
     backgroundColor: '#0A84FF',
   },
-  buttonDisabled: {
-    opacity: 0.4,
+  saveButton: {
+    backgroundColor: '#2C2C2E',
   },
   buttonText: {
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '600',
+  },
+  logContainer: {
+    backgroundColor: '#1C1C1E',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 24,
+  },
+  logTitle: {
+    color: '#8E8E93',
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  logLine: {
+    color: '#AEAEB2',
+    fontSize: 12,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    lineHeight: 18,
+  },
+  logError: {
+    color: '#EF4444',
+  },
+  logSuccess: {
+    color: '#22C55E',
+    fontWeight: '700',
   },
   clearButton: {
     alignItems: 'center',

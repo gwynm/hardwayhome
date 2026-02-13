@@ -41,6 +41,21 @@ export default function WorkoutScreen() {
     };
   }, [activeWorkout?.id]);
 
+  const confirmDiscard = () => {
+    if (stats.distance > 500) {
+      Alert.alert(
+        'Are you sure?',
+        `You have ${(stats.distance / 1000).toFixed(1)} km of data. This cannot be undone.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete', style: 'destructive', onPress: () => discard() },
+        ]
+      );
+    } else {
+      discard();
+    }
+  };
+
   const handleStop = () => {
     Alert.alert(
       'Stop Workout',
@@ -51,13 +66,13 @@ export default function WorkoutScreen() {
           style: 'cancel',
         },
         {
-          text: 'Finish & Delete',
-          style: 'destructive',
-          onPress: () => discard(),
-        },
-        {
           text: 'Finish & Save',
           onPress: () => finish(),
+        },
+        {
+          text: 'Finish & Delete',
+          style: 'destructive',
+          onPress: confirmDiscard,
         },
       ]
     );

@@ -11,7 +11,7 @@ echo ""
 
 # Regenerate native project to pick up any app.json changes (icons, permissions, plugins)
 echo "--- Regenerating native project ---"
-npx expo prebuild --platform ios --clean
+npx expo prebuild --platform ios 
 echo ""
 
 # Build and install on connected device

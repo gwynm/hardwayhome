@@ -1,5 +1,6 @@
 import { Paths, File, Directory } from 'expo-file-system';
 import { kvGet } from '@/src/db/queries';
+import { getDatabase } from '@/src/db/database';
 
 // KV keys for WebDAV config
 export const KV_WEBDAV_URL = 'backup_webdav_url';
@@ -37,6 +38,29 @@ function setStatus(status: BackupStatus): void {
 const MAX_LOCAL_BACKUPS = 10;
 
 /**
+ * Create a complete snapshot of the database using VACUUM INTO.
+ * This merges WAL journal data into a standalone file suitable for backup.
+ * Returns a File reference to the snapshot in the cache directory.
+ */
+function createSnapshot(filename: string): File {
+  const db = getDatabase();
+  const snapshotFile = new File(Paths.cache, filename);
+
+  // Remove previous snapshot with the same name if it exists
+  if (snapshotFile.exists) {
+    snapshotFile.delete();
+  }
+
+  // Convert file:// URI to filesystem path for SQLite's VACUUM INTO
+  const snapshotPath = decodeURIComponent(snapshotFile.uri.replace(/^file:\/\//, ''));
+
+  // VACUUM INTO creates a complete, standalone copy with all WAL data merged
+  db.execSync(`VACUUM INTO '${snapshotPath}';`);
+
+  return snapshotFile;
+}
+
+/**
  * Backup the SQLite database.
  *
  * 1. Always creates a local backup in the app's Documents directory.
@@ -45,18 +69,20 @@ const MAX_LOCAL_BACKUPS = 10;
  * Returns the result so callers can react if needed.
  */
 export async function backupDatabase(): Promise<BackupResult> {
-  const dbFile = new File(Paths.document, 'SQLite', 'hardwayhome.db');
-  if (!dbFile.exists) {
-    console.warn('[Backup] Database file not found');
-    return 'failed';
-  }
-
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const filename = `hardwayhome-${timestamp}.sqlite`;
 
-  // Always do a local backup
+  let snapshotFile: File;
   try {
-    localBackup(dbFile, filename);
+    snapshotFile = createSnapshot(filename);
+  } catch (err) {
+    console.error('[Backup] Failed to create snapshot:', err);
+    return 'failed';
+  }
+
+  // Always do a local backup (copy snapshot to Documents/backups)
+  try {
+    localBackup(snapshotFile, filename);
   } catch (err) {
     console.error('[Backup] Local backup failed:', err);
   }
@@ -64,6 +90,7 @@ export async function backupDatabase(): Promise<BackupResult> {
   // WebDAV upload if configured
   const url = kvGet(KV_WEBDAV_URL);
   if (!url) {
+    cleanupSnapshot(snapshotFile);
     setStatus('not_configured');
     return 'not_configured';
   }
@@ -71,14 +98,22 @@ export async function backupDatabase(): Promise<BackupResult> {
   setStatus('in_progress');
 
   try {
-    await webdavUpload(dbFile, filename, url);
+    await webdavUpload(snapshotFile, filename, url);
+    cleanupSnapshot(snapshotFile);
     setStatus('success');
     return 'success';
   } catch (err) {
     console.error('[Backup] WebDAV upload failed:', err);
+    cleanupSnapshot(snapshotFile);
     setStatus('failed');
     return 'failed';
   }
+}
+
+function cleanupSnapshot(file: File): void {
+  try {
+    if (file.exists) file.delete();
+  } catch { /* best effort */ }
 }
 
 /**
@@ -102,14 +137,13 @@ function buildAuthHeaders(): Record<string, string> {
   return headers;
 }
 
-async function webdavUpload(dbFile: File, filename: string, baseUrl: string): Promise<void> {
+async function webdavUpload(snapshotFile: File, filename: string, baseUrl: string): Promise<void> {
   // Ensure URL doesn't have trailing slash
   const url = baseUrl.replace(/\/+$/, '');
   const targetUrl = `${url}/${filename}`;
 
-  // Read the database file as a blob via its file:// URI.
-  // This avoids base64 encoding and handles binary data correctly.
-  const fileResponse = await fetch(dbFile.uri);
+  // Read the snapshot file as a blob via its file:// URI.
+  const fileResponse = await fetch(snapshotFile.uri);
   const blob = await fileResponse.blob();
 
   // HTTP PUT to WebDAV
@@ -130,41 +164,108 @@ async function webdavUpload(dbFile: File, filename: string, baseUrl: string): Pr
 }
 
 /**
- * Test the WebDAV connection with an OPTIONS request.
- * Returns true if the server responds with 2xx.
+ * Run a full backup with detailed logging for the settings screen.
+ * Calls `onLog` for each step so the UI can show progress.
+ * Uses the provided credentials (not saved KV values) so you can
+ * test before saving.
  */
-export async function testWebdavConnection(
-  url: string,
-  username: string | null,
-  password: string | null,
+export async function backupWithLogs(
+  urlInput: string,
+  usernameInput: string | null,
+  passwordInput: string | null,
+  onLog: (line: string) => void,
 ): Promise<boolean> {
+  let snapshotFile: File | null = null;
   try {
-    const headers: Record<string, string> = {};
-    if (username) {
-      headers['Authorization'] = `Basic ${btoa(`${username}:${password || ''}`)}`;
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `hardwayhome-${timestamp}.sqlite`;
+
+    onLog('Creating database snapshot (VACUUM INTO)...');
+    try {
+      snapshotFile = createSnapshot(filename);
+      onLog('Snapshot created: ' + snapshotFile.uri);
+    } catch (err) {
+      onLog('ERROR: Failed to create snapshot: ' + String(err));
+      return false;
     }
 
-    const response = await fetch(url.replace(/\/+$/, ''), {
-      method: 'OPTIONS',
+    // Local backup (copy snapshot to Documents/backups)
+    onLog('Creating local backup...');
+    try {
+      localBackup(snapshotFile, filename);
+      onLog('Local backup OK');
+    } catch (err) {
+      onLog('Local backup failed: ' + String(err));
+    }
+
+    // WebDAV
+    const url = urlInput.trim();
+    if (!url) {
+      onLog('No WebDAV URL provided, skipping remote backup.');
+      return false;
+    }
+
+    const targetUrl = `${url.replace(/\/+$/, '')}/${filename}`;
+    onLog('Target URL: ' + targetUrl);
+
+    onLog('Reading snapshot as blob...');
+    const fileResponse = await fetch(snapshotFile.uri);
+    const blob = await fileResponse.blob();
+    onLog(`Blob size: ${blob.size} bytes`);
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/x-sqlite3',
+    };
+    if (usernameInput) {
+      headers['Authorization'] = `Basic ${btoa(`${usernameInput}:${passwordInput || ''}`)}`;
+      onLog('Auth: Basic (username: ' + usernameInput + ')');
+    } else {
+      onLog('Auth: none');
+    }
+
+    onLog('Sending PUT request...');
+    const response = await fetch(targetUrl, {
+      method: 'PUT',
       headers,
+      body: blob,
     });
 
-    return response.ok;
-  } catch {
+    onLog(`Response: ${response.status} ${response.statusText}`);
+
+    if (!response.ok) {
+      let body = '';
+      try {
+        body = await response.text();
+      } catch { /* ignore */ }
+      if (body) {
+        onLog('Response body: ' + body.slice(0, 500));
+      }
+      onLog('FAILED');
+      return false;
+    }
+
+    onLog('SUCCESS');
+    setStatus('success');
+    return true;
+  } catch (err) {
+    onLog('ERROR: ' + String(err));
+    setStatus('failed');
     return false;
+  } finally {
+    if (snapshotFile) cleanupSnapshot(snapshotFile);
   }
 }
 
 // ─── Local backup ────────────────────────────────────────────────────
 
-function localBackup(dbFile: File, filename: string): void {
+function localBackup(snapshotFile: File, filename: string): void {
   const backupDir = new Directory(Paths.document, 'backups');
   if (!backupDir.exists) {
     backupDir.create();
   }
 
   const backupFile = new File(backupDir, filename);
-  dbFile.copy(backupFile);
+  snapshotFile.copy(backupFile);
   console.log('[Backup] Local backup:', backupFile.uri);
 
   // Prune old local backups
